@@ -1,0 +1,58 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0
+        with:
+          pixi-version: v0.65.0
+          environments: build
+
+      - name: Build
+        run: pixi run -e build build
+
+      - name: Prepare release
+        shell: bash
+        run: |
+          projectName="${{ github.event.repository.name }}"
+          version="${{ github.ref_name }}"
+          platform="windows"
+          arch="x86_64"
+          mkdir -p ./release
+          for dir in ./dist/*; do
+            base_dir=$(basename "$dir")
+            if [[ -f "$dir" ]]; then
+                if [[ "$base_dir" == *.* ]]; then
+                    mv "$dir" "./release/${projectName}-${base_dir%%.*}-${version}-${platform}-${arch}.${base_dir#*.}"
+                else
+                    mv "$dir" "./release/${projectName}-${base_dir}-${version}-${platform}-${arch}"
+                fi
+            elif [[ -d "$dir" ]]; then
+                (
+                    cd "${dir}"
+                    7z a -tzip "../../release/${projectName}-${base_dir}-${version}-${platform}-${arch}.zip" . -r
+                )
+            fi
+          done
+
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ./release/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

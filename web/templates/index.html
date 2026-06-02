@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proof Of Creation - 数字作品存证平台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script type="module" src="/static/js/crypto.js"></script>
+</head>
+<body>
+
+<div class="header">
+    <h1><a onclick="if(token){show_section('section-dashboard');load_dashboard()}" style="text-decoration:none;color:var(--primary);cursor:pointer">Proof Of Creation</a></h1>
+    <div class="nav">
+        <span id="nav-guest">
+            <a onclick="show_section('section-login')">登录</a>
+            <a onclick="show_section('section-register')">注册</a>
+        </span>
+        <span id="nav-user" class="hidden">
+            <a onclick="show_section('section-dashboard');load_dashboard()">首页</a>
+            <a onclick="show_create_order()">创建订单</a>
+            <a onclick="load_orders()">历史订单</a>
+            <span id="nav-username" style="font-size:13px;color:#666"></span>
+            <a onclick="logout()">登出</a>
+        </span>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- 登录 -->
+    <div id="section-login" class="section card" style="max-width:400px;margin:40px auto">
+        <h2>用户登录</h2>
+        <div id="login-alert" class="alert hidden"></div>
+        <form onsubmit="handle_login(event)">
+            <div class="form-group">
+                <label>用户名</label>
+                <input id="login-username" type="text" required maxlength="32">
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input id="login-password" type="password" required>
+            </div>
+            <button class="btn btn-primary" style="width:100%">登录</button>
+        </form>
+        <p style="text-align:center;margin-top:12px;font-size:13px">
+            没有账号？<a onclick="show_section('section-register')" style="color:var(--primary);cursor:pointer">注册</a>
+        </p>
+    </div>
+
+    <!-- 注册 -->
+    <div id="section-register" class="section hidden card" style="max-width:400px;margin:40px auto">
+        <h2>用户注册</h2>
+        <div id="register-alert" class="alert hidden"></div>
+        <form onsubmit="handle_register(event)">
+            <div class="form-group">
+                <label>用户名</label>
+                <input id="register-username" type="text" required maxlength="32">
+                <p class="hint">用户名不能重复</p>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input id="register-password" type="password" required minlength="6">
+                <p class="hint">密码长度至少6个字符</p>
+            </div>
+            <button class="btn btn-primary" style="width:100%">注册</button>
+        </form>
+        <p style="text-align:center;margin-top:12px;font-size:13px">
+            已有账号？<a onclick="show_section('section-login')" style="color:var(--primary);cursor:pointer">登录</a>
+        </p>
+    </div>
+
+    <!-- 首页控制台 -->
+    <div id="section-dashboard" class="section hidden">
+        <div id="dash-alert" class="alert hidden"></div>
+        <div class="card">
+            <h2>账户余额</h2>
+            <p class="balance-display" id="dashboard-balance">0.00 CNY</p>
+            <div class="flex-row mt-16">
+                <input id="dash-balance-input" type="number" step="0.01" min="0.01" placeholder="金额" style="width:150px" class="form-group">
+                <button class="btn btn-primary" onclick="handle_quick_deposit()">储值</button>
+                <button class="btn btn-outline" onclick="handle_quick_withdraw()">提现</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>最近订单</h2>
+            <table>
+                <thead>
+                    <tr><th>订单号</th><th>备注名</th><th>模式</th><th>状态</th><th>金额</th><th>时间</th></tr>
+                </thead>
+                <tbody id="dash-orders-tbody"></tbody>
+            </table>
+            <p class="mt-16" style="text-align:center">
+                <a onclick="load_orders()" style="color:var(--primary);cursor:pointer;font-size:14px">查看全部订单</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- 创建订单 -->
+    <div id="section-create-default" class="section">
+        <div id="create-alert" class="alert hidden"></div>
+
+        <div id="detect-status" style="font-size:12px;color:#999;margin-bottom:8px">
+            检测中: Ed25519=<span id="detect-ed">等待...</span>
+        </div>
+
+        <div class="card">
+            <h2>创建存证订单</h2>
+
+            <div class="flex-row" style="margin-bottom:16px">
+                <button id="btn-mode-default" class="btn btn-primary" onclick="switch_mode('default')">普通模式</button>
+                <button id="btn-mode-advanced" class="btn btn-outline" onclick="switch_mode('advanced')">进阶模式</button>
+            </div>
+
+            <!-- 普通模式 -->
+            <div id="create-mode-default">
+                <div class="form-group">
+                    <label>上传文件</label>
+                    <div class="file-upload" onclick="this.querySelector('input').click()">
+                        <input type="file" onchange="handle_file_select(event)">
+                        <span id="create-file-hint">点击选择文件（文件内容不会上传到服务器）</span>
+                        <span id="create-file-name" class="hidden" style="color:var(--primary)"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>文件哈希 (SHA3-256)</label>
+                    <textarea id="create-hash-display" class="mono hidden" readonly></textarea>
+                </div>
+                <div class="form-group">
+                    <label>密钥管理 (Ed25519)</label>
+                    <div class="flex-row" style="align-items:flex-start">
+                        <button class="btn btn-outline" onclick="handle_generate_key()">生成新密钥对</button>
+                    </div>
+                    <div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">或导入已有私钥：</div>
+                    <div class="flex-row" style="margin-top:4px;gap:4px">
+                        <input id="create-import-privkey" type="text" placeholder="粘贴私钥 (base64)" style="flex:1;font-family:monospace;font-size:12px">
+                        <button class="btn btn-outline" onclick="handle_import_key()">导入</button>
+                    </div>
+                    <span id="create-privkey-label" style="margin-top:8px;font-size:12px;color:var(--error)" class="hidden">私钥（仅显示一次，请自行保存）</span>
+                    <textarea id="create-privkey-display" class="mono hidden" readonly></textarea>
+                    <span id="create-pubkey-label" style="margin-top:4px;font-size:12px;color:var(--text-secondary)" class="hidden">公钥（可从私钥自动推导）</span>
+                    <textarea id="create-pubkey-display" class="mono hidden" readonly></textarea>
+                </div>
+                <div class="form-group">
+                    <label>订单备注名</label>
+                    <input id="create-file-name-input" type="text" maxlength="32" placeholder="自动生成, 可修改">
+                </div>
+            </div>
+
+            <!-- 进阶模式 -->
+            <div id="create-mode-advanced" class="hidden">
+                <div class="form-group">
+                    <label>公钥 (base64)</label>
+                    <textarea id="adv-pubkey" class="mono" placeholder="粘贴公钥 base64"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>哈希 (base64)</label>
+                    <textarea id="adv-hash" class="mono" placeholder="粘贴哈希 base64"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>签名 (base64)</label>
+                    <textarea id="adv-sig" class="mono" placeholder="粘贴签名 base64"></textarea>
+                </div>
+                <div id="adv-size-warn" class="alert alert-warning hidden">上链数据较大，费用可能较多，请确认是否继续</div>
+                <div class="form-group">
+                    <label>订单备注名</label>
+                    <input id="adv-file-name" type="text" maxlength="32" placeholder="请输入 (可备注加密算法)">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Gas上限倍率 (默认120%，不知道用途请勿修改)</label>
+                <input id="create-gas-multiplier" type="number" value="1.2" min="1.2" step="0.1">
+            </div>
+
+            <button id="btn-main-create" class="btn btn-primary" onclick="create_current_mode(event)">创建订单</button>
+        </div>
+
+        <div id="create-pricing" class="card hidden">
+            <h2>订单详情</h2>
+            <table>
+                <tr><td>Gas上限</td><td id="create-gas-limit">-</td></tr>
+                <tr><td>Gas单价</td><td id="create-gas-price">-</td></tr>
+                <tr><td>ETH/CNY汇率</td><td id="create-rate">-</td></tr>
+                <tr><td>订单有效期</td><td id="create-expiry">-</td></tr>
+                <tr><td style="font-weight:700;color:var(--primary)">支付价格</td><td style="font-weight:700;color:var(--primary)" id="create-price-display">-</td></tr>
+            </table>
+        </div>
+
+        <div id="create-pay-section" class="card hidden">
+            <h2>确认支付</h2>
+            <p style="font-size:18px;font-weight:700;color:var(--primary)">支付金额: <span id="pay-price-display"></span></p>
+            <p class="hint">此为模拟支付，点击确认即视为支付成功</p>
+            <p class="hint" style="color:var(--error)">支付成功后请自行保管好私钥、原文件和上链报告</p>
+            <button id="btn-pay" class="btn btn-success mt-16" onclick="handle_pay_order()" style="width:100%;font-size:16px;padding:12px">确认支付</button>
+        </div>
+
+        <!-- 确认弹窗 -->
+        <div id="create-confirm-modal" class="modal">
+            <div class="modal-content">
+                <h2>二次确认 - 存证数据</h2>
+                <p style="color:var(--error);font-size:13px;margin-bottom:12px">请确认以下数据无误，如因错误上传造成损失后果自负</p>
+                <div class="form-group">
+                    <label>哈希 (base64)</label>
+                    <textarea id="create-confirm-hash" class="mono" readonly></textarea>
+                </div>
+                <div class="form-group">
+                    <label>签名 (base64)</label>
+                    <textarea id="create-confirm-sig" class="mono" readonly></textarea>
+                </div>
+                <div class="form-group">
+                    <label>公钥 (base64)</label>
+                    <textarea id="create-confirm-pub" class="mono" readonly></textarea>
+                </div>
+                <div class="form-group">
+                    <label>用户ID (base64)</label>
+                    <textarea id="create-confirm-userid" class="mono" readonly></textarea>
+                </div>
+                <div class="flex-row" style="justify-content:flex-end;gap:8px">
+                    <button class="btn btn-outline" onclick="$('create-confirm-modal').classList.remove('active')">返回修改</button>
+                    <button id="btn-confirm-create" class="btn btn-primary" onclick="handle_create_order()">确认无误，创建订单</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 低版本浏览器提示 -->
+    <div id="section-create-basic" class="section hidden card">
+        <h2>创建存证订单</h2>
+        <div class="alert alert-warning">
+            您的浏览器版本过低，不支持 Ed25519 签名算法。<br>
+            您仅可使用储值、提现和浏览历史订单功能。
+        </div>
+        <button class="btn btn-outline" onclick="show_alert('create-alert','warning','请使用最新版Chrome/Edge浏览器以使用存证服务')">
+            点击创建订单（不可用）
+        </button>
+    </div>
+
+    <!-- 历史订单 -->
+    <div id="section-orders" class="section hidden">
+        <div class="card">
+            <h2>历史订单</h2>
+            <div style="overflow-x:auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>订单号</th><th>备注名</th><th>加密模式</th><th>状态</th>
+                            <th>支付金额</th><th>实际花费</th><th>返还</th>
+                            <th>Gas用量</th><th>Gas单价</th><th>汇率</th>
+                            <th>创建时间</th><th>上链时间</th><th>区块高度</th><th>交易哈希</th><th>报告</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
